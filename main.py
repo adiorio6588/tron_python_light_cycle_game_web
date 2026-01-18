@@ -1,6 +1,8 @@
 import pygame
 import sys
 import random
+import asyncio
+
 
 # -----------------------------
 # CONFIG
@@ -25,7 +27,7 @@ LEFT = (-1, 0)
 RIGHT = (1, 0)
 DIRS = [UP, DOWN, LEFT, RIGHT]
 
-# Difficulty presets (you can tweak later)
+# Difficulty presets
 DIFFICULTY = {
     "Easy":   {"fps": 8,  "aggression": 0.20},
     "Normal": {"fps": 12, "aggression": 0.45},
@@ -37,9 +39,9 @@ ROUNDS_TO_WIN = 3  # best of 5
 ASSET_TITLE = "assets/title_screen.png"
 MUSIC_PATH = "sound/background_music.wav"
 
-# NEW: sprite paths
 BLUE_SPRITE_PATH = "assets/blue_cycle.png"
 RED_SPRITE_PATH  = "assets/red_cycle.png"
+
 
 # -----------------------------
 # PLAYER CLASS
@@ -51,7 +53,7 @@ class LightCycle:
         self.trail = [start_pos]
         self.alive = True
         self.name = name
-        self.sprite = sprite  # pygame.Surface or None
+        self.sprite = sprite
 
     @property
     def head(self):
@@ -99,11 +101,11 @@ class LightCycle:
 
         spr = self._rotated_sprite()
         if spr:
-            # center sprite on the cell
             r = spr.get_rect(center=head_rect.center)
             surface.blit(spr, r)
         else:
             pygame.draw.rect(surface, self.color, head_rect)
+
 
 # -----------------------------
 # HELPERS
@@ -171,7 +173,6 @@ def choose_ai_direction(ai, human, occupied, aggression=0.45):
 
     return best
 
-# UPDATED: pass sprites into reset_round
 def reset_round(vs_ai: bool, blue_sprite=None, red_sprite=None):
     p1 = LightCycle(BLUE, (10, GRID_HEIGHT // 2), RIGHT, name="Player 1", sprite=blue_sprite)
     if vs_ai:
@@ -179,6 +180,7 @@ def reset_round(vs_ai: bool, blue_sprite=None, red_sprite=None):
     else:
         p2 = LightCycle(RED, (GRID_WIDTH - 10, GRID_HEIGHT // 2), LEFT, name="Player 2", sprite=red_sprite)
     return p1, p2
+
 
 # -----------------------------
 # UI SCREENS
@@ -188,24 +190,32 @@ def draw_center_text(screen, font, text, y, color=WHITE):
     rect = surf.get_rect(center=(WIDTH // 2, y))
     screen.blit(surf, rect)
 
-def title_screen(screen, clock, title_image):
+async def title_screen(screen, clock, title_image):
     font = pygame.font.SysFont(None, 30)
     blink_timer = 0
     show = True
 
     while True:
         clock.tick(30)
+        await asyncio.sleep(0)  # REQUIRED for web builds
+
         blink_timer += 1
         if blink_timer % 20 == 0:
             show = not show
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                pygame.quit(); sys.exit()
+                return False  # quit requested
             if event.type == pygame.KEYDOWN:
-                return
+                return True   # continue game
 
-        screen.blit(title_image, (0, 0))
+        # Draw
+        if title_image:
+            screen.blit(title_image, (0, 0))
+        else:
+            screen.fill(BLACK)
+            draw_grid(screen)
+
         if show:
             txt = font.render("PRESS ANY KEY", True, WHITE)
             rect = txt.get_rect(center=(WIDTH // 2, HEIGHT - 11))
@@ -213,16 +223,18 @@ def title_screen(screen, clock, title_image):
 
         pygame.display.flip()
 
-def mode_select_screen(screen, clock):
+async def mode_select_screen(screen, clock):
     title_font = pygame.font.SysFont(None, 54)
     font = pygame.font.SysFont(None, 30)
     small = pygame.font.SysFont(None, 24)
 
     while True:
         clock.tick(30)
+        await asyncio.sleep(0)  # REQUIRED for web builds
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                pygame.quit(); sys.exit()
+                return None
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_1:
                     return {"vs_ai": True, "best_of": 1}
@@ -246,13 +258,33 @@ def mode_select_screen(screen, clock):
 
         pygame.display.flip()
 
+
 # -----------------------------
 # MAIN
 # -----------------------------
-def main():
+async def main():
     pygame.init()
 
-    # Init audio + play background music (loop)
+    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    pygame.display.set_caption("TRON Light Cycles")
+    clock = pygame.time.Clock()
+
+    # Load title image from assets/
+    title_img = None
+    try:
+        title_img = pygame.image.load(ASSET_TITLE).convert()
+        title_img = pygame.transform.scale(title_img, (WIDTH, HEIGHT))
+    except Exception as e:
+        print(f"[WARN] Could not load title screen image: {ASSET_TITLE}\n{e}")
+        title_img = None
+
+    # Title screen (wait for keypress)
+    ok = await title_screen(screen, clock, title_img)
+    if not ok:
+        pygame.quit()
+        return
+
+    # Init audio AFTER first user input (better for web browsers)
     try:
         pygame.mixer.init()
         pygame.mixer.music.load(MUSIC_PATH)
@@ -261,23 +293,16 @@ def main():
     except Exception as e:
         print(f"[WARN] Music not playing: {MUSIC_PATH}\n{e}")
 
-    screen = pygame.display.set_mode((WIDTH, HEIGHT))
-    pygame.display.set_caption("TRON Light Cycles")
-    clock = pygame.time.Clock()
-
-    # Load title image from assets/
-    try:
-        title_img = pygame.image.load(ASSET_TITLE).convert()
-        title_img = pygame.transform.scale(title_img, (WIDTH, HEIGHT))
-    except Exception as e:
-        print(f"[WARN] Could not load title screen image: {ASSET_TITLE}\n{e}")
-        title_img = None
-
-    if title_img:
-        title_screen(screen, clock, title_img)
-
     # Pick mode after title screen
-    settings = mode_select_screen(screen, clock)
+    settings = await mode_select_screen(screen, clock)
+    if settings is None:
+        try:
+            pygame.mixer.music.stop()
+        except Exception:
+            pass
+        pygame.quit()
+        return
+
     vs_ai = settings["vs_ai"]
     best_of = settings["best_of"]
 
@@ -286,7 +311,7 @@ def main():
     fps = DIFFICULTY[difficulty]["fps"]
     aggression = DIFFICULTY[difficulty]["aggression"]
 
-    # NEW: load cycle sprites and scale to cell size
+    # Load cycle sprites and scale to cell size
     def load_cycle_sprite(path):
         try:
             img = pygame.image.load(path).convert_alpha()
@@ -303,7 +328,7 @@ def main():
     scores = {"P1": 0, "P2": 0}
     rounds_to_win = 1 if best_of == 1 else ROUNDS_TO_WIN
 
-    # Start first round (UPDATED)
+    # Start first round
     player1, player2 = reset_round(vs_ai, blue_sprite=blue_sprite, red_sprite=red_sprite)
     round_over = False
     winner_text = ""
@@ -313,25 +338,31 @@ def main():
 
     while True:
         clock.tick(fps)
+        await asyncio.sleep(0)  # REQUIRED for WebAssembly/web (pygbag)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                pygame.mixer.music.stop()
+                try:
+                    pygame.mixer.music.stop()
+                except Exception:
+                    pass
                 pygame.quit()
-                sys.exit()
+                return
 
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    pygame.mixer.music.stop()
+                    try:
+                        pygame.mixer.music.stop()
+                    except Exception:
+                        pass
                     pygame.quit()
-                    sys.exit()
+                    return
 
                 if round_over:
                     if event.key == pygame.K_r:
                         # If match already ended, reset match scores
                         if best_of == 5 and (scores["P1"] >= rounds_to_win or scores["P2"] >= rounds_to_win):
                             scores = {"P1": 0, "P2": 0}
-                        # UPDATED
                         player1, player2 = reset_round(vs_ai, blue_sprite=blue_sprite, red_sprite=red_sprite)
                         round_over = False
                         winner_text = ""
@@ -443,5 +474,6 @@ def main():
 
         pygame.display.flip()
 
+
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
