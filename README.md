@@ -1,12 +1,21 @@
-# tron_python_light_cycle_game
-python pygame game-development tron ai
+# tron_python_light_cycle_game_web
+python pygame webassembly html5 pygbag game-development tron ai
 
-# 🟦 TRON: Light Cycles (Python / pygame)
+# 🟦 TRON: Light Cycles — WebAssembly Edition
 
-A modern remake of the classic **Tron Light Cycles** game built with **Python and pygame**.  
-Includes **single-player vs AI**, **two-player mode**, **difficulty selection**, **neon glow trails**, and **best-of-5 round scoring**.
+A **browser-playable WebAssembly (HTML5)** adaptation of the Tron-inspired **Light Cycles** game, originally built with **Python + pygame**.
 
-This project was built as a learning exercise in game logic, AI behavior, and real-time systems using modern Python tooling.
+This version is modified to run directly in modern web browsers using **pygbag**, allowing the game to be played online without installing Python or pygame.  
+The original desktop version lives in a separate repository.
+
+---
+
+## 🌐 Web Version Overview
+
+- Runs fully in the browser via **WebAssembly**
+- No downloads required for players
+- Designed for embedding on platforms like itch.io and Systeme.io
+- Same core gameplay and logic as the desktop version
 
 ---
 
@@ -16,36 +25,38 @@ This project was built as a learning exercise in game logic, AI behavior, and re
 - ✅ Two Player local mode
 - 🎯 Difficulty Selector (Easy / Normal / Hard)
 - 🧠 AI opponent with survival + aggression logic
+- 🟦 Neon glow light trails
 - ⌨️ Keyboard controls
-- 🐍 Python 3.12 compatible
+- 🌐 Browser-playable (HTML5 / WebAssembly)
 
 ---
 
 ## 🕹️ Controls
 
-### Player 1 (Blue)
-- `W` `A` `S` `D` — Move
-
-### Player 2 (Red) – Two Player Mode
-- Arrow Keys — Move
-
-### Menu
-- `1` — Single Player vs AI
-- `2` — Two Player Mode
-- `E` — Easy
-- `N` — Normal
-- `H` — Hard
-
-### Game
-- `R` — Restart round
-- `ESC` — Return to menu
-- Close window — Quit game
+- **Arrow Keys** — Move Player 1
+- **WASD** — Move Player 2 (two-player mode)
+- Avoid walls, trails, and collisions to survive
 
 ---
 
-## ⚙️ Installation & Setup
+## 🧪 Technical Details
 
-### Requirements
+- Language: **Python**
+- Engine: **pygame**
+- Web runtime: **WebAssembly (via pygbag)**
+- Python version: **3.12+ recommended**
+- Desktop build and Web build are maintained separately
+
+---
+
+## 🚀 Running the Web Version Locally
+
+### 1️⃣ Create a build environment
+```bash
+python3 -m venv .venv-web
+source .venv-web/bin/activate
+pip install pygbag
+
 - Python **3.12**
 - pygame
 
