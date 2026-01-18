@@ -24,7 +24,7 @@ YELLOW = (255, 220, 80)
 UP = (0, -1)
 DOWN = (0, 1)
 LEFT = (-1, 0)
-RIGHT = (1, 0)
+RIGHT = = (1, 0)
 DIRS = [UP, DOWN, LEFT, RIGHT]
 
 # Difficulty presets
@@ -67,14 +67,10 @@ class LightCycle:
         self.trail.append((x + dx, y + dy))
 
     def change_direction(self, new_dir):
-        # Prevent reversing
         if (-new_dir[0], -new_dir[1]) != self.direction:
             self.direction = new_dir
 
     def _rotated_sprite(self):
-        """Rotate sprite so it faces current direction.
-        Assumes the base sprite faces RIGHT by default.
-        """
         if self.sprite is None:
             return None
 
@@ -90,12 +86,10 @@ class LightCycle:
         return pygame.transform.rotate(self.sprite, angle)
 
     def draw(self, surface):
-        # draw trail as colored blocks (excluding head)
         for x, y in self.trail[:-1]:
             rect = pygame.Rect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE)
             pygame.draw.rect(surface, self.color, rect)
 
-        # draw head as sprite (fallback to block if missing)
         hx, hy = self.head
         head_rect = pygame.Rect(hx * CELL_SIZE, hy * CELL_SIZE, CELL_SIZE, CELL_SIZE)
 
@@ -195,6 +189,10 @@ async def title_screen(screen, clock, title_image):
     blink_timer = 0
     show = True
 
+    # Web/WASM fix: clear any startup events and wait a beat so it doesn't auto-skip
+    pygame.event.clear()
+    await asyncio.sleep(0.5)
+
     while True:
         clock.tick(30)
         await asyncio.sleep(0)  # REQUIRED for web builds
@@ -205,11 +203,14 @@ async def title_screen(screen, clock, title_image):
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                return False  # quit requested
-            if event.type == pygame.KEYDOWN:
-                return True   # continue game
+                return False
+            # Only accept a real keypress (prevents "auto key" on browser focus)
+            if event.type == pygame.KEYDOWN and event.key != pygame.K_UNKNOWN:
+                return True
+            # Nice for web/mobile: allow click/tap to start too
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                return True
 
-        # Draw
         if title_image:
             screen.blit(title_image, (0, 0))
         else:
@@ -269,7 +270,6 @@ async def main():
     pygame.display.set_caption("TRON Light Cycles")
     clock = pygame.time.Clock()
 
-    # Load title image from assets/
     title_img = None
     try:
         title_img = pygame.image.load(ASSET_TITLE).convert()
@@ -278,7 +278,6 @@ async def main():
         print(f"[WARN] Could not load title screen image: {ASSET_TITLE}\n{e}")
         title_img = None
 
-    # Title screen (wait for keypress)
     ok = await title_screen(screen, clock, title_img)
     if not ok:
         pygame.quit()
@@ -293,7 +292,6 @@ async def main():
     except Exception as e:
         print(f"[WARN] Music not playing: {MUSIC_PATH}\n{e}")
 
-    # Pick mode after title screen
     settings = await mode_select_screen(screen, clock)
     if settings is None:
         try:
@@ -306,12 +304,10 @@ async def main():
     vs_ai = settings["vs_ai"]
     best_of = settings["best_of"]
 
-    # Difficulty (kept simple: Normal defaults)
     difficulty = "Normal"
     fps = DIFFICULTY[difficulty]["fps"]
     aggression = DIFFICULTY[difficulty]["aggression"]
 
-    # Load cycle sprites and scale to cell size
     def load_cycle_sprite(path):
         try:
             img = pygame.image.load(path).convert_alpha()
@@ -324,11 +320,9 @@ async def main():
     blue_sprite = load_cycle_sprite(BLUE_SPRITE_PATH)
     red_sprite = load_cycle_sprite(RED_SPRITE_PATH)
 
-    # Scores only used in best-of-5
     scores = {"P1": 0, "P2": 0}
     rounds_to_win = 1 if best_of == 1 else ROUNDS_TO_WIN
 
-    # Start first round
     player1, player2 = reset_round(vs_ai, blue_sprite=blue_sprite, red_sprite=red_sprite)
     round_over = False
     winner_text = ""
@@ -360,7 +354,6 @@ async def main():
 
                 if round_over:
                     if event.key == pygame.K_r:
-                        # If match already ended, reset match scores
                         if best_of == 5 and (scores["P1"] >= rounds_to_win or scores["P2"] >= rounds_to_win):
                             scores = {"P1": 0, "P2": 0}
                         player1, player2 = reset_round(vs_ai, blue_sprite=blue_sprite, red_sprite=red_sprite)
@@ -368,7 +361,6 @@ async def main():
                         winner_text = ""
                     continue
 
-                # Player 1 = ARROW KEYS
                 if event.key == pygame.K_UP:
                     player1.change_direction(UP)
                 elif event.key == pygame.K_DOWN:
@@ -378,7 +370,6 @@ async def main():
                 elif event.key == pygame.K_RIGHT:
                     player1.change_direction(RIGHT)
 
-                # Player 2 = WASD (only in 2P)
                 if not vs_ai:
                     if event.key == pygame.K_w:
                         player2.change_direction(UP)
@@ -390,14 +381,12 @@ async def main():
                         player2.change_direction(RIGHT)
 
         if not round_over:
-            # AI move
             if vs_ai:
                 occ_now = build_occupied([player1, player2])
                 player2.change_direction(
                     choose_ai_direction(player2, player1, occ_now, aggression=aggression)
                 )
 
-            # Move
             player1.move()
             player2.move()
 
@@ -429,13 +418,11 @@ async def main():
                     if best_of == 5:
                         scores["P2"] += 1
 
-        # Draw
         screen.fill(BLACK)
         draw_grid(screen)
         player1.draw(screen)
         player2.draw(screen)
 
-        # Score (ONLY for best-of-5)
         if best_of == 5:
             right_name = "AI" if vs_ai else "P2"
             hud = hud_font.render(
@@ -445,7 +432,6 @@ async def main():
             )
             screen.blit(hud, (10, 10))
 
-        # Round/match overlay
         if round_over:
             overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
             overlay.fill((0, 0, 0, 170))
