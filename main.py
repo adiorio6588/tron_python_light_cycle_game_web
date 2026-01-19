@@ -24,7 +24,7 @@ YELLOW = (255, 220, 80)
 UP = (0, -1)
 DOWN = (0, 1)
 LEFT = (-1, 0)
-RIGHT = = (1, 0)
+RIGHT = (1, 0)
 DIRS = [UP, DOWN, LEFT, RIGHT]
 
 # Difficulty presets
@@ -104,6 +104,17 @@ class LightCycle:
 # -----------------------------
 # HELPERS
 # -----------------------------
+
+def start_music():
+    try:
+        if not pygame.mixer.get_init():
+            pygame.mixer.init()
+        pygame.mixer.music.load(MUSIC_PATH)
+        pygame.mixer.music.set_volume(0.4)
+        pygame.mixer.music.play(-1, fade_ms=1500)
+    except Exception as e:
+        print(f"[WARN] Music not playing: {MUSIC_PATH}\n{e}")
+
 def draw_grid(surface):
     for x in range(0, WIDTH, CELL_SIZE):
         pygame.draw.line(surface, GRAY, (x, 0), (x, HEIGHT))
